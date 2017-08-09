@@ -3,7 +3,7 @@
 
 {
     'name': '[JOS] Automated Payment on Successful Payment TX',
-    'category': 'Sale',
+    'category': 'Accounting',
     'summary': 'Custom',
     'version': '1.0',
     'description': """
@@ -12,8 +12,9 @@ record on successful payment transactions (from payment acquirer). For Authorize
         """,
     'depends': ['base','payment_authorize','account_accountant'],
     'data': [
-        'data/views.xml',
         'data/fields_actions.xml',
+        'data/views.xml',
+
     ],
     'installable': True,
     'application': True,
