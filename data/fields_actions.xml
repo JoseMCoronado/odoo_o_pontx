@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+  <!--Fields on res.company to set default journal and delimeter-->
+  <record model="ir.model.fields" id="jos_pontx_delimeter">
+    <field name="name">x_delimeter</field>
+    <field name="field_description">Delimeter</field>
+    <field name="ttype">char</field>
+    <field name="model_id" ref="base.model_res_company"/>
+    <field name="store" eval="True"/>
+  </record>
+  <record model="ir.model.fields" id="jos_pontx_journal">
+    <field name="name">x_def_journal</field>
+    <field name="field_description">Delimeter</field>
+    <field name="ttype">char</field>
+    <field name="model_id" ref="base.model_res_company"/>
+    <field name="store" eval="True"/>
+  </record>
+  <!--Server action that is called every time a record is updated and state=='done'-->
+  <record model="ir.actions.server" id="jos_pontx_ptxtopa">
+    <field name="model_id" ref="payment_authorize.model_payment_transaction"/>
+    <field name="name">[JOS] Payment Record on Payment Transaction</field>
+    <field name="sequence">5</field>
+    <field name="state">code</field>
+    <field name="condition">object.state == 'done'</field>
+    <field name="code"><![CDATA[if record.state and record.state == 'done':
+    #only create if there is no account.payment referencing this transaction
+    search_payment = env['account.payment'].search([('payment_transaction_id','=',record.id)], limit=1)
+    if not search_payment:
+
+        delimiter = record.acquirer_id.company_id.x_delimeter
+        journal = record.acquirer_id.company_id.x_def_journal
+        txreference = record.reference
+        odoo_partner = False
+        payment_method = env.ref('account.account_payment_method_manual_in')
+
+        if not odoo_partner:
+            search_invoice = env['account.invoice'].search([('number','=',txreference)], limit=1)
+            if search_invoice:
+                odoo_partner = search_invoice.partner_id.id
+
+        if not odoo_partner:
+            search_saleorder = env['sale.order'].search([('name','=',txreference)], limit=1)
+            if search_saleorder:
+                odoo_partner = search_saleorder.partner_id.id
+
+        #special search made for client
+        if not odoo_partner:
+            specref = txreference.split(delimiter)
+            search_special = env['sale.order'].search([('name','=',specref[0])], limit=1)
+            if search_special:
+                odoo_partner = search_special.partner_id.id
+
+        #only run match if we have a partner_id --> if not we would get a null constraing error
+        if odoo_partner:
+            vals = {'payment_type': 'inbound',
+                    'payment_date': datetime.datetime.now().strftime("%Y-%m-%d"),
+                    'memo':  record.reference,
+                    'partner_type': 'customer',
+                    'payment_method_id': payment_method.id,
+                    'payment_transaction_id': record.id,
+                    'partner_id': odoo_partner,
+                    'journal_id': journal,
+                    'amount': record.amount,
+                    }
+            creation = env['account.payment'].sudo().create(vals)
+            creation.post()
+
+      ]]>
+    </field>
+  </record>
+  <!--Automated Action that calls above server action-->
+  <record model="base.action.rule" id="jos_pontx_auto_ptxtopa">
+    <field name="name">[JOS] Payment Record on Payment Transaction</field>
+    <field name="active" eval="True"/>
+    <field name="sequence" eval="2"/>
+    <field name="model_id" ref="payment_authorize.model_payment_transaction"/>
+    <field name="kind">on_write</field>
+    <field name="server_action_ids" eval="[(6,0,[ref('jos_pontx_ptxtopa')])]"/>
+  </record>
+</odoo>
